@@ -38,6 +38,7 @@ END_LEGAL */
 
 #include <iostream>
 #include <fstream>
+#include <iomanip>
 
 #include "dcache.H"
 #include "pin_profile.H"
@@ -90,7 +91,8 @@ namespace DL1
     const UINT32 max_associativity = 256; // associativity;
     const CACHE_ALLOC::STORE_ALLOCATION allocation = CACHE_ALLOC::STORE_ALLOCATE;
 
-    typedef CACHE_ROUND_ROBIN(max_sets, max_associativity, allocation) CACHE;
+    //typedef CACHE_ROUND_ROBIN(max_sets, max_associativity, allocation) CACHE;
+    typedef CACHE_ROUND_ROBIN_INFINITE(max_sets, max_associativity, allocation) CACHE;
 }
 
 DL1::CACHE* dl1 = NULL;
@@ -308,7 +310,7 @@ VOID Fini(int code, VOID * v)
 	    << (dl1->CacheSize()/KILO) << "K\n";
     
     outFile << "# Cache Block Size: "
-	    << dl1->LineSize() << "\n";
+	    <<  dl1->LineSize() << "\n";
 
     outFile << "# Associativity: "
 	    << dl1->Associativity() << "\n";

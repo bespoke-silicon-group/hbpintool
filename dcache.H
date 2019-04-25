@@ -43,7 +43,7 @@ END_LEGAL */
 typedef UINT64 CACHE_STATS; // type of cache hit/miss counters
 
 #include <sstream>
-
+#include <vector>
 /*! RMR (rodric@gmail.com) 
  *   - temporary work around because decstr()
  *     casts 64 bit ints to 32 bit ones
@@ -193,6 +193,73 @@ class ROUND_ROBIN
         _tags[index] = tag;
         // condition typically faster than modulo
         _nextReplaceIndex = (index == 0 ? _tagsLastIndex : index - 1);
+    }
+};
+
+
+/*!
+ *  @brief Cache set that never ejects any tags
+ */
+template <UINT32 MAX_ASSOCIATIVITY = 4>
+class ROUND_ROBIN_INFINITE
+{
+  private:
+    std::vector<CACHE_TAG> _tags;
+    //CACHE_TAG _tags[MAX_ASSOCIATIVITY];
+    //UINT32 _tagsLastIndex;
+    UINT32 _nextReplaceIndex;
+
+    UINT32 GetTagsLastIndex() const { return _tags.size() - 1; }
+    
+  public:
+    ROUND_ROBIN_INFINITE(UINT32 associativity = MAX_ASSOCIATIVITY)
+	: _tags(associativity)
+    //: _tagsLastIndex(associativity - 1)
+    {
+        ASSERTX(associativity <= MAX_ASSOCIATIVITY);
+        _nextReplaceIndex = GetTagsLastIndex();
+
+        for (INT32 index = GetTagsLastIndex(); index >= 0; index--)
+        {
+            _tags[index] = CACHE_TAG(0);
+        }
+    }
+
+    VOID SetAssociativity(UINT32 associativity)
+    {
+        ASSERTX(associativity <= MAX_ASSOCIATIVITY);
+        //_tagsLastIndex = associativity - 1;
+	_tags.resize(associativity, CACHE_TAG(0));
+        _nextReplaceIndex = GetTagsLastIndex();
+    }
+    UINT32 GetAssociativity(UINT32 associativity) { return GetTagsLastIndex() + 1; }
+
+    /*
+     * MHR: change this function to return true only on cold misses
+     */
+    UINT32 Find(CACHE_TAG tag)
+    {
+        bool result = true;
+
+        for (INT32 index = GetTagsLastIndex(); index >= 0; index--)
+        {
+            // this is an ugly micro-optimization, but it does cause a
+            // tighter assembly loop for ARM that way ...
+            if(_tags[index] == tag) goto end;
+        }
+        result = false;
+
+        end: return result;
+    }
+
+    VOID Replace(CACHE_TAG tag)
+    {
+        // g++ -O3 too dumb to do CSE on following lines?!
+        const UINT32 index = _nextReplaceIndex;
+
+        _tags[index] = tag;
+        // condition typically faster than modulo
+        _nextReplaceIndex = (index == 0 ? GetTagsLastIndex() : index - 1);
     }
 };
 
@@ -459,7 +526,10 @@ bool CACHE<SET,MAX_SETS,STORE_ALLOCATION>::AccessSingleLine(ADDRINT addr, ACCESS
 }
 
 // define shortcuts
-#define CACHE_DIRECT_MAPPED(MAX_SETS, ALLOCATION) CACHE<CACHE_SET::DIRECT_MAPPED, MAX_SETS, ALLOCATION>
-#define CACHE_ROUND_ROBIN(MAX_SETS, MAX_ASSOCIATIVITY, ALLOCATION) CACHE<CACHE_SET::ROUND_ROBIN<MAX_ASSOCIATIVITY>, MAX_SETS, ALLOCATION>
-
+#define CACHE_DIRECT_MAPPED(MAX_SETS, ALLOCATION) \
+    CACHE<CACHE_SET::DIRECT_MAPPED, MAX_SETS, ALLOCATION>
+#define CACHE_ROUND_ROBIN(MAX_SETS, MAX_ASSOCIATIVITY, ALLOCATION) \
+    CACHE<CACHE_SET::ROUND_ROBIN<MAX_ASSOCIATIVITY>, MAX_SETS, ALLOCATION>
+#define CACHE_ROUND_ROBIN_INFINITE(MAX_SETS, MAX_ASSOCIATIVITY, ALLOCATION) \
+    CACHE<CACHE_SET::ROUND_ROBIN_INFINITE<MAX_ASSOCIATIVITY>, MAX_SETS, ALLOCATION>
 #endif // PIN_CACHE_H
