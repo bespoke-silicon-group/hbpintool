@@ -44,6 +44,7 @@ typedef UINT64 CACHE_STATS; // type of cache hit/miss counters
 
 #include <sstream>
 #include <vector>
+
 /*! RMR (rodric@gmail.com) 
  *   - temporary work around because decstr()
  *     casts 64 bit ints to 32 bit ones
@@ -254,12 +255,7 @@ class ROUND_ROBIN_INFINITE
 
     VOID Replace(CACHE_TAG tag)
     {
-        // g++ -O3 too dumb to do CSE on following lines?!
-        const UINT32 index = _nextReplaceIndex;
-
-        _tags[index] = tag;
-        // condition typically faster than modulo
-        _nextReplaceIndex = (index == 0 ? GetTagsLastIndex() : index - 1);
+	_tags.push_back(tag); // we always have room in this fantasy cache :-)
     }
 };
 

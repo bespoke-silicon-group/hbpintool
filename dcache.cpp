@@ -42,8 +42,11 @@ END_LEGAL */
 
 #include "dcache.H"
 #include "pin_profile.H"
+#include "instlib.H"
+#include "filter.H"
 
 std::ofstream outFile;
+INSTLIB::FILTER_RTN filter;
 
 /* ===================================================================== */
 /* Commandline Switches */
@@ -65,6 +68,9 @@ KNOB<UINT32> KnobLineSize(KNOB_MODE_WRITEONCE, "pintool",
     "b","32", "cache block size in bytes");
 KNOB<UINT32> KnobAssociativity(KNOB_MODE_WRITEONCE, "pintool",
     "a","4", "cache associativity (1 for direct mapped)");
+
+KNOB<BOOL> KnobColdOnly(KNOB_MODE_WRITEONCE, "pintool",
+    "co", "1", "only count 'cold' cache misses");
 
 /* ===================================================================== */
 /* Print Help Message                                                    */
@@ -91,8 +97,8 @@ namespace DL1
     const UINT32 max_associativity = 256; // associativity;
     const CACHE_ALLOC::STORE_ALLOCATION allocation = CACHE_ALLOC::STORE_ALLOCATE;
 
-    //typedef CACHE_ROUND_ROBIN(max_sets, max_associativity, allocation) CACHE;
-    typedef CACHE_ROUND_ROBIN_INFINITE(max_sets, max_associativity, allocation) CACHE;
+    typedef CACHE_ROUND_ROBIN(max_sets, max_associativity, allocation) CACHE;
+    //typedef CACHE_ROUND_ROBIN_INFINITE(max_sets, max_associativity, allocation) CACHE;
 }
 
 DL1::CACHE* dl1 = NULL;
@@ -192,6 +198,13 @@ VOID StoreSingleFast(ADDRINT addr)
 
 VOID Instruction(INS ins, void * v)
 {
+    RTN rtn = INS_Rtn(ins);
+    if (!RTN_Valid(rtn))
+	return;
+    
+    if (!filter.SelectRtn(rtn))
+    	return;
+    
     if (INS_IsMemoryRead(ins) && INS_IsStandardMemop(ins))
     {
         // map sparse INS addresses to dense IDs
@@ -362,6 +375,8 @@ int main(int argc, char *argv[])
     threshold[COUNTER_MISS] = KnobThresholdMiss.Value();
     
     profile.SetThreshold( threshold );
+
+    filter.Activate();
     
     INS_AddInstrumentFunction(Instruction, 0);
     PIN_AddFiniFunction(Fini, 0);
