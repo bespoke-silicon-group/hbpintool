@@ -72,6 +72,9 @@ KNOB<UINT32> KnobAssociativity(KNOB_MODE_WRITEONCE, "pintool",
 KNOB<BOOL> KnobColdOnly(KNOB_MODE_WRITEONCE, "pintool",
     "co", "1", "only count 'cold' cache misses");
 
+KNOB<std::string> KnobRtnEpochMarker(KNOB_MODE_WRITEONCE, "pintool",
+                                     "epoch_marker", "", "Routine to set as the epoch marker");
+
 /* ===================================================================== */
 /* Print Help Message                                                    */
 /* ===================================================================== */
@@ -97,11 +100,12 @@ namespace DL1
     const UINT32 max_associativity = 256; // associativity;
     const CACHE_ALLOC::STORE_ALLOCATION allocation = CACHE_ALLOC::STORE_ALLOCATE;
 
-    typedef CACHE_ROUND_ROBIN(max_sets, max_associativity, allocation) CACHE;
-    //typedef CACHE_ROUND_ROBIN_INFINITE(max_sets, max_associativity, allocation) CACHE;
+    //typedef CACHE_ROUND_ROBIN(max_sets, max_associativity, allocation) CACHE;
+    typedef CACHE_ROUND_ROBIN_INFINITE(max_sets, max_associativity, allocation) CACHE;
 }
 
 DL1::CACHE* dl1 = NULL;
+UINT32 dl1_reset_count = 0;
 
 typedef enum
 {
@@ -319,6 +323,9 @@ VOID Fini(int code, VOID * v)
     
     outFile << "PIN:MEMLATENCIES 1.0. 0x0\n";
 
+    outFile << "# Reset Count: "
+            << dl1_reset_count << "\n";
+    
     outFile << "# Cache Size: "
 	    << (dl1->CacheSize()/KILO) << "K\n";
     
@@ -350,6 +357,29 @@ VOID Fini(int code, VOID * v)
 /* Main                                                                  */
 /* ===================================================================== */
 
+static void resetDl1(void)
+{
+        if (dl1)
+                delete dl1;
+
+        dl1 = new DL1::CACHE("L1 Data Cache",
+                             KnobCacheSize.Value() * KILO,
+                             KnobLineSize.Value(),
+                             KnobAssociativity.Value());
+
+        dl1_reset_count++;
+}
+
+static void Routine(RTN rtn, void *v)
+{
+        if (!filter.SelectRtn(rtn))
+                return;
+
+        // reset dl1 every time the epoch marker is called
+        if (RTN_Name(rtn) == KnobRtnEpochMarker.Value())
+                resetDl1();
+}
+
 int main(int argc, char *argv[])
 {
     PIN_InitSymbols();
@@ -361,10 +391,9 @@ int main(int argc, char *argv[])
 
     outFile.open(KnobOutputFile.Value().c_str());
 
-    dl1 = new DL1::CACHE("L1 Data Cache", 
-                         KnobCacheSize.Value() * KILO,
-                         KnobLineSize.Value(),
-                         KnobAssociativity.Value());
+    resetDl1();   
+
+    RTN_AddInstrumentFunction(Routine, NULL);
     
     profile.SetKeyName("iaddr          ");
     profile.SetCounterName("dcache:miss        dcache:hit");
