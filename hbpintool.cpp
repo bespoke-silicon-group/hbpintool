@@ -53,7 +53,7 @@ INSTLIB::FILTER_RTN filter;
 /* ===================================================================== */
 
 KNOB<string> KnobOutputFile(KNOB_MODE_WRITEONCE,    "pintool",
-    "o", "dcache.out", "specify dcache file name");
+    "o", "hbpintool.out", "specify hbpintool file name");
 KNOB<BOOL>   KnobTrackLoads(KNOB_MODE_WRITEONCE,    "pintool",
     "tl", "0", "track individual loads -- increases profiling time");
 KNOB<BOOL>   KnobTrackStores(KNOB_MODE_WRITEONCE,   "pintool",

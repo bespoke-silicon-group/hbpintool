@@ -1,0 +1,104 @@
+#!/bin/bash
+
+# check that we have access to needed tools
+# check objdump
+# check grep
+# check awk
+# check file
+
+tools="objdump grep awk file"
+
+for tool in ${tools}; do
+    if [ -z `which ${tool}` ]; then
+	>&2 echo "Error: Missing ${tool}: Please make sure that ${tool} is installed and in your PATH"
+	exit 1
+    fi
+done
+
+# this programs name
+executable=`basename ${0}`
+# location of Intel Pin
+pin=${PIN_ROOT}/pin
+# pin tool location
+pintool=${HBPINTOOL_ROOT}/obj-intel64/hbpintool.so
+# flags to pass to our pintool
+pintool_flags=""
+pintool_flags="${pintool_flags} -a 1"   # direct mapped
+pintool_flags="${pintool_flags} -c 1" # cache size
+pintool_flags="${pintool_flags} -b 32"  # cache block size
+
+# usage function -- prints how to use this program
+function usage () {
+    echo "Usage: ${executable} YOUR-PROGRAM YOUR-PROGRAM-ARGS..."
+    echo "Options:"
+    echo "        -h,--help         Print this help message and exit"
+    echo "        -o,--output       Filename for instrumenting results (default is hbpintool.out)"
+}
+
+if [ -z "${PIN_ROOT}" ]; then
+    >&2 echo "Error: PIN_ROOT not defined -- Be sure to source the 'SOURCE_THIS' file included with hbpintool!" 
+    exit 1
+fi
+
+# parse options
+options=`getopt -o h,o: --long help,output: -- "${@}"`
+if [ ! $? -eq 0 ]; then
+    echo "Bad options"
+    exit 1
+fi
+eval set -- "${options}"
+
+while true; do
+    case "$1" in
+        -h|--help)   usage; exit 0;;
+	-o|--output) shift; pintool_flags="${pintool_flags} -o ${1}"; break;;
+        --)          shift; break;;
+    esac
+    shift
+done
+
+# set program name and arguments
+executable_name=$1
+shift # result of the arguments are set '$@'
+
+# if there's no exutable then we should just quit
+if [ -z "${executable_name}" ]; then
+    >&2 echo "Error: No input"
+    usage
+    exit 1
+fi
+
+# check that the file exists
+file_check_stderr=$(2>&1 >/dev/null file ${executable_name})
+file_check_stdout=`file ${executable_name}`
+if [ ! -z "${file_check_stderr}" ]; then
+    >&2 echo "Error: ${file_check_stderr}"
+    usage
+    exit 1
+fi
+
+# check that this file is a supported executable type
+supported_executable_type="ELF 64-bit LSB executable, x86-64"
+file_supported=`echo ${file_check_stdout} | grep "${supported_executable_type}"`
+if [ -z "${file_supported}" ]; then
+    >&2 echo "Error: ${executable_name}: Unsupported executable type: only ${supported_executable_type} is supported"
+    usage
+    exit 1
+fi
+   
+# get the name-mangled version of "edgeset_apply"
+edgeset_apply_func=`objdump -t ${executable_name} | grep edgeset_apply | awk '{print $6}'`
+if [ -z "${edgeset_apply_func}" ]; then
+    >&2 echo "Warning: The edgeset_apply function has been optimized out"
+    >&2 echo "         We recommend adding '__attribute__((noinline))' to the definition of 'edgeset_apply_*' in your GraphIt-generated C++ file."
+    >&2 echo "         Results for HammerBlade hardware will be less accurate"
+else
+    pintool_flags="${pintool_flags} -filter_rtn ${edgeset_apply_func} -epoch_marker ${edgeset_apply_func}"
+fi
+
+echo "${pin} -t ${pintool} ${pintool_flags} -- ./${executable_name} ${@} >/dev/null"
+${pin} -t ${pintool} ${pintool_flags} -- ./${executable_name} ${@} >/dev/null
+
+# instrument with our pintool
+#${pin} -t ${pintool} -filter_rtn "${edgeset_apply_func}" -epoch_marker "${edgeset_apply_func}" ${pintool_flags} -- ./${executable_name} ${@} >/dev/null
+
