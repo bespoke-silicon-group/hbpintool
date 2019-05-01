@@ -23,9 +23,9 @@ pin=${PIN_ROOT}/pin
 pintool=${HBPINTOOL_ROOT}/obj-intel64/hbpintool.so
 # flags to pass to our pintool
 pintool_flags=""
-pintool_flags="${pintool_flags} -a 1"   # direct mapped
-pintool_flags="${pintool_flags} -c 1" # cache size
-pintool_flags="${pintool_flags} -b 32"  # cache block size
+pintool_flags="${pintool_flags} -a 1"    # direct mapped
+pintool_flags="${pintool_flags} -c 2"   # Cach size in KB
+pintool_flags="${pintool_flags} -b 1024"  # cache block size
 
 # usage function -- prints how to use this program
 function usage () {
@@ -98,7 +98,3 @@ fi
 
 echo "${pin} -t ${pintool} ${pintool_flags} -- ./${executable_name} ${@} >/dev/null"
 ${pin} -t ${pintool} ${pintool_flags} -- ./${executable_name} ${@} >/dev/null
-
-# instrument with our pintool
-#${pin} -t ${pintool} -filter_rtn "${edgeset_apply_func}" -epoch_marker "${edgeset_apply_func}" ${pintool_flags} -- ./${executable_name} ${@} >/dev/null
-
