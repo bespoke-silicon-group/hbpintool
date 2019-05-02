@@ -137,106 +137,92 @@ typedef std::vector<DL1::CACHE_HAMMERBLADE*>DL1_ARRAY;
 
 // holds the counters with misses and hits
 // conceptually this is an array indexed by instruction address
-COMPRESSOR_COUNTER<ADDRINT, UINT32, COUNTER_HIT_MISS> profile;
-COMPRESSOR_COUNTER<ADDRINT, UINT32, COUNTER_HIT_MISS> profile_intel;
+// COMPRESSOR_COUNTER<ADDRINT, UINT32, COUNTER_HIT_MISS> profile;
+// COMPRESSOR_COUNTER<ADDRINT, UINT32, COUNTER_HIT_MISS> profile_intel;
 
 DL1_ARRAY hammerblade_dl1s;
-static UINT32 dl1_reset_count(void) { return hammerblade_dl1s.size(); }
+
+
+typedef std::vector<UINT64> ICOUNTER;
+
+/* indexed by COUNTER */
+ICOUNTER hammerblade_icount(COUNTER_NUM, 0);
+ICOUNTER intel_icount(COUNTER_NUM,0);
+
+
 
 /* ===================================================================== */
 
-VOID LoadMulti(ADDRINT addr, UINT32 size, UINT32 instId)
+static void ResetDl1(void)
+{    
+    dl1 = new DL1::CACHE_HAMMERBLADE("HammerBlade L1",
+				     KnobCacheSize.Value() * KILO,
+				     KnobLineSize.Value(),
+				     KnobAssociativity.Value());
+    hammerblade_dl1s.push_back(dl1);
+}
+
+static void Routine(RTN rtn, void *v)
 {
-    // first level D-cache
-    const BOOL dl1Hit = dl1->Access(addr, size, CACHE_BASE::ACCESS_TYPE_LOAD);
+    if (!filter.SelectRtn(rtn))
+	return;
     
-    const COUNTER counter = dl1Hit ? COUNTER_HIT : COUNTER_MISS;    
-    profile[instId][counter]++;
-
-    const BOOL dl1IntelHit = dl1_intel->Access(addr, size, CACHE_BASE::ACCESS_TYPE_LOAD);    
-    const COUNTER intelCounter = dl1IntelHit ? COUNTER_HIT : COUNTER_MISS;
-    profile_intel[instId][intelCounter]++;
+    // reset dl1 every time the epoch marker is called
+    if (RTN_Name(rtn) == KnobRtnEpochMarker.Value()) {
+	RTN_Open(rtn);
+	RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR) ResetDl1, IARG_END);
+    }	
 }
 
-/* ===================================================================== */
-
-VOID StoreMulti(ADDRINT addr, UINT32 size, UINT32 instId)
+static
+VOID CountInstruction(bool intel_hit, bool hammerblade_hit)
 {
-    // first level D-cache
-    const BOOL dl1Hit = dl1->Access(addr, size, CACHE_BASE::ACCESS_TYPE_STORE);
-
-    const COUNTER counter = dl1Hit ? COUNTER_HIT : COUNTER_MISS;
-    profile[instId][counter]++;
-
-    const BOOL dl1IntelHit = dl1_intel->Access(addr, size, CACHE_BASE::ACCESS_TYPE_STORE);    
-    const COUNTER intelCounter = dl1IntelHit ? COUNTER_HIT : COUNTER_MISS;
-    profile_intel[instId][intelCounter]++;
+    intel_icount[intel_hit ? COUNTER_HIT : COUNTER_MISS]++;
+    hammerblade_icount[hammerblade_hit ? COUNTER_HIT : COUNTER_MISS]++;
 }
 
-/* ===================================================================== */
-
-VOID LoadSingle(ADDRINT addr, UINT32 instId)
+static
+VOID LoadStoreInstruction(ADDRINT read_addr,  UINT32 read_size,
+			  ADDRINT write_addr, UINT32 write_size)
 {
-    // @todo we may access several cache lines for 
-    // first level D-cache
-    const BOOL dl1Hit = dl1->AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_LOAD);
+    bool intel_hit, hammerblade_hit;
 
-    const COUNTER counter = dl1Hit ? COUNTER_HIT : COUNTER_MISS;
-    profile[instId][counter]++;
+    intel_hit = dl1_intel->Access(read_addr, read_size, CACHE_BASE::ACCESS_TYPE_LOAD);
+    hammerblade_hit = dl1->Access(read_addr, read_size, CACHE_BASE::ACCESS_TYPE_LOAD);
 
-    const BOOL dl1IntelHit = dl1_intel->AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_LOAD);    
-    const COUNTER intelCounter = dl1IntelHit ? COUNTER_HIT : COUNTER_MISS;
-    profile_intel[instId][intelCounter]++;
+    intel_hit &= dl1_intel->Access(write_addr, write_size, CACHE_BASE::ACCESS_TYPE_STORE);
+    hammerblade_hit &= dl1->Access(write_addr, write_size, CACHE_BASE::ACCESS_TYPE_STORE);
+
+    CountInstruction(intel_hit, hammerblade_hit);
 }
-/* ===================================================================== */
 
-VOID StoreSingle(ADDRINT addr, UINT32 instId)
+static
+VOID LoadInstruction(ADDRINT read_addr, UINT32 read_size)
 {
-    // @todo we may access several cache lines for 
-    // first level D-cache
-    const BOOL dl1Hit = dl1->AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_STORE);
+    bool intel_hit, hammerblade_hit;
 
-    const COUNTER counter = dl1Hit ? COUNTER_HIT : COUNTER_MISS;
-    profile[instId][counter]++;
+    intel_hit = dl1_intel->Access(read_addr, read_size, CACHE_BASE::ACCESS_TYPE_LOAD);
+    hammerblade_hit = dl1->Access(read_addr, read_size, CACHE_BASE::ACCESS_TYPE_LOAD);
 
-    const BOOL dl1IntelHit = dl1_intel->AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_STORE);    
-    const COUNTER intelCounter = dl1IntelHit ? COUNTER_HIT : COUNTER_MISS;
-    profile_intel[instId][intelCounter]++;
+    CountInstruction(intel_hit, hammerblade_hit);
 }
 
-/* ===================================================================== */
-
-VOID LoadMultiFast(ADDRINT addr, UINT32 size)
+static
+VOID StoreInstruction(ADDRINT write_addr, UINT32 write_size)
 {
-    dl1->Access(addr, size, CACHE_BASE::ACCESS_TYPE_LOAD);
-    dl1_intel->Access(addr, size, CACHE_BASE::ACCESS_TYPE_LOAD);
+    bool intel_hit, hammerblade_hit;
+
+    intel_hit = dl1_intel->Access(write_addr, write_size, CACHE_BASE::ACCESS_TYPE_STORE);
+    hammerblade_hit = dl1->Access(write_addr, write_size, CACHE_BASE::ACCESS_TYPE_STORE);
+
+    CountInstruction(intel_hit, hammerblade_hit);
 }
 
-/* ===================================================================== */
-
-VOID StoreMultiFast(ADDRINT addr, UINT32 size)
+static
+VOID NonMemoryInstruction()
 {
-    dl1->Access(addr, size, CACHE_BASE::ACCESS_TYPE_STORE);
-    dl1_intel->Access(addr, size, CACHE_BASE::ACCESS_TYPE_STORE);
+    CountInstruction(true, true);
 }
-
-/* ===================================================================== */
-
-VOID LoadSingleFast(ADDRINT addr)
-{
-    dl1->AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_LOAD);
-    dl1_intel->AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_LOAD);
-}
-
-/* ===================================================================== */
-
-VOID StoreSingleFast(ADDRINT addr)
-{
-    dl1->AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_STORE);
-    dl1_intel->AccessSingleLine(addr, CACHE_BASE::ACCESS_TYPE_STORE);
-}
-
-
 
 /* ===================================================================== */
 
@@ -248,166 +234,46 @@ VOID Instruction(INS ins, void * v)
     
     if (!filter.SelectRtn(rtn))
     	return;
-    
-    if (INS_IsMemoryRead(ins) && INS_IsStandardMemop(ins))
-    {
-        // map sparse INS addresses to dense IDs
-        const ADDRINT iaddr = INS_Address(ins);
-        const UINT32 instId = profile.Map(iaddr);
 
-        const UINT32 size = INS_MemoryReadSize(ins);
-        const BOOL   single = (size <= 4);
-                
-        if( KnobTrackLoads )
-        {
-            if( single )
-            {
-                INS_InsertPredicatedCall(
-                    ins, IPOINT_BEFORE, (AFUNPTR) LoadSingle,
-                    IARG_MEMORYREAD_EA,
-                    IARG_UINT32, instId,
-                    IARG_END);
-            }
-            else
-            {
-                INS_InsertPredicatedCall(
-                    ins, IPOINT_BEFORE,  (AFUNPTR) LoadMulti,
-                    IARG_MEMORYREAD_EA,
-                    IARG_MEMORYREAD_SIZE,
-                    IARG_UINT32, instId,
-                    IARG_END);
-            }
-                
-        }
-        else
-        {
-            if( single )
-            {
-                INS_InsertPredicatedCall(
-                    ins, IPOINT_BEFORE,  (AFUNPTR) LoadSingleFast,
-                    IARG_MEMORYREAD_EA,
-                    IARG_END);
-                        
-            }
-            else
-            {
-                INS_InsertPredicatedCall(
-                    ins, IPOINT_BEFORE,  (AFUNPTR) LoadMultiFast,
-                    IARG_MEMORYREAD_EA,
-                    IARG_MEMORYREAD_SIZE,
-                    IARG_END);
-            }
-        }
-    }
-        
-    if ( INS_IsMemoryWrite(ins) && INS_IsStandardMemop(ins))
-    {
-        // map sparse INS addresses to dense IDs
-        const ADDRINT iaddr = INS_Address(ins);
-        const UINT32 instId = profile.Map(iaddr);
-            
-        const UINT32 size = INS_MemoryWriteSize(ins);
+    bool is_memory_read, is_memory_write;
 
-        const BOOL   single = (size <= 4);
-                
-        if( KnobTrackStores )
-        {
-            if( single )
-            {
-                INS_InsertPredicatedCall(
-                    ins, IPOINT_BEFORE,  (AFUNPTR) StoreSingle,
-                    IARG_MEMORYWRITE_EA,
-                    IARG_UINT32, instId,
-                    IARG_END);
-            }
-            else
-            {
-                INS_InsertPredicatedCall(
-                    ins, IPOINT_BEFORE,  (AFUNPTR) StoreMulti,
-                    IARG_MEMORYWRITE_EA,
-                    IARG_MEMORYWRITE_SIZE,
-                    IARG_UINT32, instId,
-                    IARG_END);
-            }
-                
-        }
-        else
-        {
-            if( single )
-            {
-                INS_InsertPredicatedCall(
-                    ins, IPOINT_BEFORE,  (AFUNPTR) StoreSingleFast,
-                    IARG_MEMORYWRITE_EA,
-                    IARG_END);
-                        
-            }
-            else
-            {
-                INS_InsertPredicatedCall(
-                    ins, IPOINT_BEFORE,  (AFUNPTR) StoreMultiFast,
-                    IARG_MEMORYWRITE_EA,
-                    IARG_MEMORYWRITE_SIZE,
-                    IARG_END);
-            }
-        }
-            
-    }
-}
-
-/* ===================================================================== */
-static void OriginalFini(int code, VOID *v)
-{
-    // print D-cache profile
-    // @todo what does this print
-    
-    outFile << "PIN:MEMLATENCIES 1.0. 0x0\n";
-
-    outFile << "HammerBlade Cache Parameters" << "\n";
-    outFile << "# Reset Count: "
-            << dl1_reset_count() << "\n";    
-    outFile << "# Cache Size: "
-	    << (dl1->CacheSize()/KILO) << "K\n";    
-    outFile << "# Cache Block Size: "
-	    <<  dl1->LineSize() << "\n";
-    outFile << "# Associativity: "
-	    << dl1->Associativity() << "\n";
-
-    outFile << "\n";
-    
-    outFile << "Host CPU Cache Parameters" << "\n";
-    outFile << "# Cache Size: "
-	    << (dl1_intel->CacheSize()/KILO) << "K\n";    
-    outFile << "# Cache Block Size: "
-	    <<  dl1_intel->LineSize() << "\n";
-    outFile << "# Associativity: "
-	    << dl1_intel->Associativity() << "\n";
-
-    outFile <<
-        "#\n"
-        "# DCACHE stats\n"
-        "#\n";
-    
-    outFile << dl1->StatsLong("# ", CACHE_BASE::CACHE_TYPE_DCACHE);
-    outFile << "\n";
-    outFile << dl1_intel->StatsLong("# ", CACHE_BASE::CACHE_TYPE_DCACHE);
-    
-    if( KnobTrackLoads || KnobTrackStores ) {
-        outFile <<
-            "#\n"
-            "# LOAD stats\n"
-            "#\n";
-        
-        outFile << profile.StringLong();
-    }
-
-    
-    //outFile.close();
+    is_memory_read  = INS_IsMemoryRead(ins) && INS_IsStandardMemop(ins);
+    is_memory_write = INS_IsMemoryWrite(ins) && INS_IsStandardMemop(ins);
+    if (is_memory_read && is_memory_write) {
+	INS_InsertPredicatedCall(
+	    ins, IPOINT_BEFORE, (AFUNPTR) LoadStoreInstruction,
+	    IARG_MEMORYREAD_EA,
+	    IARG_MEMORYREAD_SIZE,
+	    IARG_MEMORYWRITE_EA,
+	    IARG_MEMORYWRITE_SIZE,
+	    IARG_END);	
+    } else if (is_memory_read) {
+	// for instructions that read
+	INS_InsertPredicatedCall(
+	    ins, IPOINT_BEFORE, (AFUNPTR) LoadInstruction,
+	    IARG_MEMORYREAD_EA,
+	    IARG_MEMORYREAD_SIZE,
+	    IARG_END);	
+    } else if (is_memory_write) {
+	// for instructions that write
+	INS_InsertPredicatedCall(
+	    ins, IPOINT_BEFORE, (AFUNPTR) StoreInstruction,
+	    IARG_MEMORYWRITE_EA,
+	    IARG_MEMORYWRITE_SIZE,
+	    IARG_END);
+    } else {
+	// for non memory instructions
+	INS_InsertPredicatedCall(
+	    ins, IPOINT_BEFORE, (AFUNPTR) NonMemoryInstruction,
+	    IARG_END);
+    }        
 }
 
 static void HBPintoolFini(int code, void *v)
 {
-    // cacheline size => watts
-    
+    const int prefix_width = 11;
+    std::string hammerblade_prefix = "HammerBlade";
+    std::string xeon_prefix        = "CPU";
     /* output our number */
     /* which is ? */
     /* I guess its the sum of cache hits * W1 */
@@ -428,46 +294,88 @@ static void HBPintoolFini(int code, void *v)
 #undef NANOSECONDS
     
     POWER_MAP power (power_pairs, power_pairs + array_size(power_pairs));
-    LATENCY_MAP latency(latency_pairs, latency_pairs + array_size(latency_pairs));   
-    UINT32 hb_ld_misses = 0,  hb_st_misses = 0;
-    const std::string energy_message_prefix = "HammerBlade Energy Cost: ";
-    
-    for (DL1_ARRAY::iterator it = hammerblade_dl1s.begin();
-	 it != hammerblade_dl1s.end();
-	 it++) {
-	DL1::CACHE_HAMMERBLADE *cache = *it;
-	hb_ld_misses += cache->Misses(CACHE_BASE::ACCESS_TYPE_LOAD);
-	hb_st_misses += cache->Misses(CACHE_BASE::ACCESS_TYPE_STORE);
-    }
+    LATENCY_MAP latency(latency_pairs, latency_pairs + array_size(latency_pairs));
 
-    // calculate approximate energy for our system
-    // total misses * latency[clsize] * watts[clsize]
+    // CPI = 1 for non misses, 1 + clock latency for misses
+    // TPI = CPI / HZ
+    // T = (TPI_miss * misses + TPI_hit * hits) / threads
+    // W_xeon        = 25 + W_hbm_64_byte_access
+    // W_hammerblade = 1000 * W_manycore_1.4 + W_hbm_XXXX_byte_access
+    
+    double CPI_hammerblade_hit = 1.0;
+    double CPI_xeon_hit = 1.0;
+    double TPI_hammerblade_hit, TPI_hammerblade_miss;
+    double TPI_xeon_hit, TPI_xeon_miss;
+    double HZ_hammerblade = 1e9, HZ_xeon  = 4e9;
+    double Cores_hammerblade = 512, Cores_xeon = 4;
+    double Time_hammerblade, Time_xeon;
+    double Watts_hammerblade, Watts_xeon;
+    double WPC_hammerblade = 0.0056;
+    double WPC_xeon = 25.0;
+    
+    TPI_hammerblade_hit = CPI_hammerblade_hit / HZ_hammerblade;
+    TPI_xeon_hit = CPI_xeon_hit / HZ_xeon;
+
+    /* calculate time per miss */
     UINT32 line_size = dl1->LineSize();
     ASSERTX((line_size % 32) == 0);
 
-    POWER_MAP::iterator pwit = power.find(std::max(dl1->LineSize(), 1024u));
-    if (pwit == power.end()) {
-	outFile << energy_message_prefix << ": Could not find wattage for cache line size of " << dl1->LineSize() << "\n";
-	return;
-    }
-    
-    LATENCY_MAP::iterator latit = latency.find(dl1->LineSize());
-    if (latit == latency.end()) {
-	outFile << energy_message_prefix << ": Could not find memory access latency for cache line size of " << dl1->LineSize() << "\n";
-	return;
-    }
-    
-    double watts = pwit->second, ns = latit->second;
+    LATENCY_MAP::iterator latency_it;
 
-    // the 1e-9 factor is to account for latency being measured in nanoseconds
-    outFile << "HammerBlade Energy Cost: " <<  std::scientific << watts * ns * (hb_ld_misses + hb_st_misses) * 1e-9 << " J\n";
-    outFile << "Intel Energy Cost:       " <<  std::scientific << watts * ns * (dl1_intel->Misses(CACHE_BASE::ACCESS_TYPE_LOAD) * dl1_intel->Misses(CACHE_BASE::ACCESS_TYPE_STORE)) * 1e-9 << " J\n";
-    //outFile.close();
+    latency_it = latency.find(line_size);
+    if (latency_it == latency.end()) {
+	outFile << std::setw(prefix_width) << hammerblade_prefix << "Error: could not lookup latency for memory access size of " << dl1->LineSize() << "\n";
+	return;
+    }
+    TPI_hammerblade_miss = TPI_hammerblade_hit + (latency_it->second * 1e-9);
+
+    latency_it = latency.find(std::min(INTEL_CACHELINE_SIZE, 16384));
+    if (latency_it == latency.end()) {
+	outFile << std::setw(prefix_width) << xeon_prefix << "Error: could not lookup latency for memory access size of " << dl1_intel->LineSize() << "\n";
+	return;
+    }    
+    TPI_xeon_miss = TPI_xeon_hit + (latency_it->second * 1e-9);
+
+    /* calculate hammerblade runtime */
+    Time_hammerblade  = (TPI_hammerblade_hit  * hammerblade_icount[COUNTER_HIT])/Cores_hammerblade; // hits
+    Time_hammerblade += (TPI_hammerblade_miss * hammerblade_icount[COUNTER_MISS]); // +misses
+
+    /* calculate xeon runtime */
+    Time_xeon =  (TPI_xeon_hit * intel_icount[COUNTER_HIT])/Cores_xeon; // hits
+    Time_xeon += (TPI_xeon_miss * intel_icount[COUNTER_MISS]); // +misses
+
+    // outFile << std::setw(prefix_width) << hammerblade_prefix << " Runtime: " << std::scientific << Time_hammerblade << "s" << "\n";
+    // outFile << std::setw(prefix_width) << xeon_prefix << " Runtime: " << std::scientific << Time_xeon << "s" << "\n";
+    
+    /* Calculate Watts */
+    POWER_MAP::iterator dram_watts;
+
+    dram_watts = power.find(dl1->LineSize());
+    if (dram_watts == power.end()) {
+	outFile << std::setw(prefix_width) << hammerblade_prefix << "Error: could not lookup power for memory access size of " << dl1->LineSize() << "\n";
+	return;
+    }
+    Watts_hammerblade = (WPC_hammerblade * Cores_hammerblade) + dram_watts->second;
+
+    dram_watts = power.find(INTEL_CACHELINE_SIZE);
+    if (dram_watts == power.end()) {
+	outFile << std::setw(prefix_width) << xeon_prefix << "Error: could not lookup power for memory access size of " << INTEL_CACHELINE_SIZE << "\n";
+	return;
+    }
+    Watts_xeon = (WPC_xeon * Cores_xeon) + dram_watts->second;
+
+    double Joules_hammerblade = Time_hammerblade * Watts_hammerblade;
+    double Joules_xeon = Time_xeon * Watts_xeon;
+    
+    outFile << std::setw(prefix_width) << hammerblade_prefix << " Energy Cost: " << std::scientific << Joules_hammerblade << " J\n";
+    outFile << std::setw(prefix_width) << xeon_prefix << " Energy Cost: " << std::scientific << Joules_xeon << " J\n";
+
+    outFile << "Energy Improvment Ratio (" << xeon_prefix << "/" << hammerblade_prefix << "): " << std::fixed << Joules_xeon/Joules_hammerblade << "\n";
 }
 
 VOID Fini(int code, VOID * v)
 {
-    OriginalFini(code, v);
+    // OriginalFini(code, v);
     HBPintoolFini(code, v);
     outFile.close();
 }
@@ -475,24 +383,6 @@ VOID Fini(int code, VOID * v)
 /* Main                                                                  */
 /* ===================================================================== */
 
-static void resetDl1(void)
-{    
-    dl1 = new DL1::CACHE_HAMMERBLADE("HammerBlade L1",
-				     KnobCacheSize.Value() * KILO,
-				     KnobLineSize.Value(),
-				     KnobAssociativity.Value());
-    hammerblade_dl1s.push_back(dl1);
-}
-
-static void Routine(RTN rtn, void *v)
-{
-    if (!filter.SelectRtn(rtn))
-	return;
-
-    // reset dl1 every time the epoch marker is called
-    if (RTN_Name(rtn) == KnobRtnEpochMarker.Value())
-	resetDl1();
-}
 
 int main(int argc, char *argv[])
 {
@@ -510,19 +400,19 @@ int main(int argc, char *argv[])
 				     INTEL_CACHELINE_SIZE, // block size
 				     INTEL_ASSOCIATIVITY); // associativity
     
-    resetDl1();   
+    ResetDl1();   
 
     RTN_AddInstrumentFunction(Routine, NULL);
     
-    profile.SetKeyName("iaddr          ");
-    profile.SetCounterName("dcache:miss        dcache:hit");
+    // profile.SetKeyName("iaddr          ");
+    // profile.SetCounterName("dcache:miss        dcache:hit");
 
     COUNTER_HIT_MISS threshold;
 
     threshold[COUNTER_HIT] = KnobThresholdHit.Value();
     threshold[COUNTER_MISS] = KnobThresholdMiss.Value();
     
-    profile.SetThreshold( threshold );
+    // profile.SetThreshold( threshold );
 
     filter.Activate();
     
