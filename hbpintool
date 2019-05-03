@@ -101,4 +101,4 @@ else
 fi
 
 echo "${pin} -t ${pintool} ${pintool_flags} -- ./${executable_name} ${@} >/dev/null"
-${pin} -t ${pintool} ${pintool_flags} -- ./${executable_name} ${@} >/dev/null
+${pin} -t ${pintool} ${pintool_flags} -- ${executable_name} ${@} >/dev/null
