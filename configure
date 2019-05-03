@@ -1,0 +1,2 @@
+#!/bin/bash
+wget -O - https://software.intel.com/sites/landingpage/pintool/downloads/pin-3.7-97619-g0d0c92f4f-gcc-linux.tar.gz | tar zx
