@@ -78,7 +78,7 @@ if [ ! -z "${file_check_stderr}" ]; then
 fi
 
 # check that this file is a supported executable type
-supported_executable_type="ELF 64-bit LSB executable, x86-64"
+supported_executable_type="x86-64"
 file_supported=`echo ${file_check_stdout} | grep "${supported_executable_type}"`
 if [ -z "${file_supported}" ]; then
     >&2 echo "Error: ${executable_name}: Unsupported executable type: only ${supported_executable_type} is supported"
