@@ -171,6 +171,7 @@ static void Routine(RTN rtn, void *v)
     if (RTN_Name(rtn) == KnobRtnEpochMarker.Value()) {
 	RTN_Open(rtn);
 	RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR) ResetDl1, IARG_END);
+	RTN_Close(rtn);
     }	
 }
 
