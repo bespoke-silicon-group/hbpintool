@@ -48,7 +48,7 @@
 #include "instlib.H"
 #include "filter.H"
 
-#define INTEL_CACHE_SIZE     (2 * MEGA)
+#define INTEL_CACHE_SIZE     (64 * MEGA)
 #define INTEL_CACHELINE_SIZE  64
 #define INTEL_ASSOCIATIVITY   8
 
@@ -274,7 +274,7 @@ static void HBPintoolFini(int code, void *v)
 {
     const int prefix_width = 11;
     std::string hammerblade_prefix = "HammerBlade";
-    std::string xeon_prefix        = "CPU";
+    std::string xeon_prefix        = "Xeon E7-8894 v4";
     /* output our number */
     /* which is ? */
     /* I guess its the sum of cache hits * W1 */
@@ -307,12 +307,12 @@ static void HBPintoolFini(int code, void *v)
     double CPI_xeon_hit = 1.0;
     double TPI_hammerblade_hit, TPI_hammerblade_miss;
     double TPI_xeon_hit, TPI_xeon_miss;
-    double HZ_hammerblade = 1e9, HZ_xeon  = 4e9;
-    double Cores_hammerblade = 512, Cores_xeon = 4;
+    double HZ_hammerblade = 1e9, HZ_xeon  = 2.4e9;
+    double Cores_hammerblade = 512, Cores_xeon = 24;
     double Time_hammerblade, Time_xeon;
-    double Watts_hammerblade, Watts_xeon;
+    double Watts_hammerblade;
     double WPC_hammerblade = 0.0056;
-    double WPC_xeon = 25.0;
+    double Watts_xeon = 165.0;
     
     TPI_hammerblade_hit = CPI_hammerblade_hit / HZ_hammerblade;
     TPI_xeon_hit = CPI_xeon_hit / HZ_xeon;
@@ -363,7 +363,7 @@ static void HBPintoolFini(int code, void *v)
 	outFile << std::setw(prefix_width) << xeon_prefix << "Error: could not lookup power for memory access size of " << INTEL_CACHELINE_SIZE << "\n";
 	return;
     }
-    Watts_xeon = (WPC_xeon * Cores_xeon) + dram_watts->second;
+    Watts_xeon += dram_watts->second;
 
     double Joules_hammerblade = Time_hammerblade * Watts_hammerblade;
     double Joules_xeon = Time_xeon * Watts_xeon;
