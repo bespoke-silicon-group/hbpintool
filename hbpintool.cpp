@@ -272,7 +272,7 @@ VOID Instruction(INS ins, void * v)
 
 static void HBPintoolFini(int code, void *v)
 {
-    const int prefix_width = 11;
+    const int prefix_width = 16;
     std::string hammerblade_prefix = "HammerBlade";
     std::string xeon_prefix        = "Xeon E7-8894 v4";
     /* output our number */
@@ -317,6 +317,7 @@ static void HBPintoolFini(int code, void *v)
     double WPC_hammerblade = 0.0056;
     double Watts_xeon = 165.0;
     double DDR4_JPBit = 60e-12;
+    double HBM2_JPBit = 7e-12;
     
     TPI_hammerblade_hit = CPI_hammerblade_hit / HZ_hammerblade;
     TPI_xeon_hit = CPI_xeon_hit / HZ_xeon;
@@ -362,7 +363,8 @@ static void HBPintoolFini(int code, void *v)
 	outFile << std::setw(prefix_width) << hammerblade_prefix << "Error: could not lookup power for memory access size of " << dl1->LineSize() << "\n";
 	return;
     }
-    Watts_hammerblade = (WPC_hammerblade * Cores_hammerblade) + dram_watts->second;
+    //Watts_hammerblade = (WPC_hammerblade * Cores_hammerblade) + dram_watts->second;
+    Watts_hammerblade = (WPC_hammerblade * Cores_hammerblade);
 
     dram_watts = power.find(INTEL_CACHELINE_SIZE);
     if (dram_watts == power.end()) {
@@ -371,7 +373,7 @@ static void HBPintoolFini(int code, void *v)
     }
     //Watts_xeon += dram_watts->second;
 
-    double Joules_hammerblade = Time_hammerblade * Watts_hammerblade;
+    double Joules_hammerblade = Time_hammerblade * Watts_hammerblade + (HBM2_JPBit * dl1->LineSize() * 8 * intel_icount[COUNTER_MISS]);
     double Joules_xeon = Time_xeon * Watts_xeon + (DDR4_JPBit * INTEL_CACHELINE_SIZE * 8 * intel_icount[COUNTER_MISS]);
     
     outFile << std::setw(prefix_width) << hammerblade_prefix << " Energy Cost: " << std::scientific << Joules_hammerblade << " J\n";
