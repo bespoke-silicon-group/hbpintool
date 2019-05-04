@@ -302,17 +302,21 @@ static void HBPintoolFini(int code, void *v)
     // T = (TPI_miss * misses + TPI_hit * hits) / threads
     // W_xeon        = 25 + W_hbm_64_byte_access
     // W_hammerblade = 1000 * W_manycore_1.4 + W_hbm_XXXX_byte_access
-    
+
+    double IPC_xeon_hit = 3;
+    double IPC_hammerblade_hit = 1;
     double CPI_hammerblade_hit = 1.0;
     double CPI_xeon_hit = 1.0;
     double TPI_hammerblade_hit, TPI_hammerblade_miss;
     double TPI_xeon_hit, TPI_xeon_miss;
     double HZ_hammerblade = 1e9, HZ_xeon  = 2.4e9;
-    double Cores_hammerblade = 512, Cores_xeon = 24;
+    double Cores_hammerblade = 512;
+    double Cores_xeon = 24;
     double Time_hammerblade, Time_xeon;
     double Watts_hammerblade;
     double WPC_hammerblade = 0.0056;
     double Watts_xeon = 165.0;
+    double DDR4_JPBit = 1e-12;
     
     TPI_hammerblade_hit = CPI_hammerblade_hit / HZ_hammerblade;
     TPI_xeon_hit = CPI_xeon_hit / HZ_xeon;
@@ -338,11 +342,13 @@ static void HBPintoolFini(int code, void *v)
     TPI_xeon_miss = TPI_xeon_hit + (latency_it->second * 1e-9);
 
     /* calculate hammerblade runtime */
-    Time_hammerblade  = (TPI_hammerblade_hit  * hammerblade_icount[COUNTER_HIT])/Cores_hammerblade; // hits
+    //Time_hammerblade  = (TPI_hammerblade_hit  * hammerblade_icount[COUNTER_HIT])/Cores_hammerblade; // hits
+    Time_hammerblade = hammerblade_icount[COUNTER_HIT] / (IPC_hammerblade_hit * Cores_hammerblade) / HZ_hammerblade;
     Time_hammerblade += (TPI_hammerblade_miss * hammerblade_icount[COUNTER_MISS]); // +misses
 
     /* calculate xeon runtime */
-    Time_xeon =  (TPI_xeon_hit * intel_icount[COUNTER_HIT])/Cores_xeon; // hits
+    //Time_xeon =  (TPI_xeon_hit * intel_icount[COUNTER_HIT])/Cores_xeon; // hits
+    Time_xeon = (intel_icount[COUNTER_HIT] / (IPC_xeon_hit * Cores_xeon)) / HZ_xeon;
     Time_xeon += (TPI_xeon_miss * intel_icount[COUNTER_MISS]); // +misses
 
     // outFile << std::setw(prefix_width) << hammerblade_prefix << " Runtime: " << std::scientific << Time_hammerblade << "s" << "\n";
