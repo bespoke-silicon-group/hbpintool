@@ -316,7 +316,7 @@ static void HBPintoolFini(int code, void *v)
     double Watts_hammerblade;
     double WPC_hammerblade = 0.0056;
     double Watts_xeon = 165.0;
-    double DDR4_JPBit = 1e-12;
+    double DDR4_JPBit = 60e-12;
     
     TPI_hammerblade_hit = CPI_hammerblade_hit / HZ_hammerblade;
     TPI_xeon_hit = CPI_xeon_hit / HZ_xeon;
@@ -369,10 +369,10 @@ static void HBPintoolFini(int code, void *v)
 	outFile << std::setw(prefix_width) << xeon_prefix << "Error: could not lookup power for memory access size of " << INTEL_CACHELINE_SIZE << "\n";
 	return;
     }
-    Watts_xeon += dram_watts->second;
+    //Watts_xeon += dram_watts->second;
 
     double Joules_hammerblade = Time_hammerblade * Watts_hammerblade;
-    double Joules_xeon = Time_xeon * Watts_xeon;
+    double Joules_xeon = Time_xeon * Watts_xeon + (DDR4_JPBit * INTEL_CACHELINE_SIZE * 8 * intel_icount[COUNTER_MISS]);
     
     outFile << std::setw(prefix_width) << hammerblade_prefix << " Energy Cost: " << std::scientific << Joules_hammerblade << " J\n";
     outFile << std::setw(prefix_width) << xeon_prefix << " Energy Cost: " << std::scientific << Joules_xeon << " J\n";
