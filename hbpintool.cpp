@@ -235,7 +235,7 @@ VOID Instruction(INS ins, void * v)
     
     if (!filter.SelectRtn(rtn))
     	return;
-
+    
     bool is_memory_read, is_memory_write;
 
     is_memory_read  = INS_IsMemoryRead(ins) && INS_IsStandardMemop(ins);
@@ -275,107 +275,22 @@ static void HBPintoolFini(int code, void *v)
     const int prefix_width = 16;
     std::string hammerblade_prefix = "HammerBlade";
     std::string xeon_prefix        = "Xeon E7-8894 v4";
-    /* output our number */
-    /* which is ? */
-    /* I guess its the sum of cache hits * W1 */
-#define WATTS(access_size, power)		\
-    CLSIZE_WATTS_PAIR(access_size, power),
     
-    static CLSIZE_WATTS_PAIR power_pairs [] = {
-#include "hbm_power.inc"
-    };
-#undef WATTS
-
-#define NANOSECONDS(access_size, ns)			\
-    CLSIZE_LATENCY_PAIR(access_size, ns),
-    
-    static CLSIZE_LATENCY_PAIR latency_pairs [] = {
-#include "hbm_latency.inc"
-    };
-#undef NANOSECONDS
-    
-    POWER_MAP power (power_pairs, power_pairs + array_size(power_pairs));
-    LATENCY_MAP latency(latency_pairs, latency_pairs + array_size(latency_pairs));
-
-    // CPI = 1 for non misses, 1 + clock latency for misses
-    // TPI = CPI / HZ
-    // T = (TPI_miss * misses + TPI_hit * hits) / threads
-    // W_xeon        = 25 + W_hbm_64_byte_access
-    // W_hammerblade = 1000 * W_manycore_1.4 + W_hbm_XXXX_byte_access
-
-    double IPC_xeon_hit = 3;
-    double IPC_hammerblade_hit = 1;
-    double CPI_hammerblade_hit = 1.0;
-    double CPI_xeon_hit = 1.0;
-    double TPI_hammerblade_hit, TPI_hammerblade_miss;
-    double TPI_xeon_hit, TPI_xeon_miss;
-    double HZ_hammerblade = 1e9, HZ_xeon  = 2.4e9;
-    double Cores_hammerblade = 512;
-    double Cores_xeon = 24;
-    double Time_hammerblade, Time_xeon;
-    double Watts_hammerblade;
-    double WPC_hammerblade = 0.0056;
-    double Watts_xeon = 165.0;
+    // instruction energy costs
+    double Xeon_JPInstruction = 1e-9;
+    double HammerBlade_JPInstruction = 9.4e-12;
+    // memory energy costs
     double DDR4_JPBit = 60e-12;
-    double HBM2_JPBit = 7e-12;
+    double HBM2_JPBit = 3.9e-12;
+        
+    double Joules_hammerblade =
+              HammerBlade_JPInstruction * (intel_icount[COUNTER_HIT]+intel_icount[COUNTER_MISS])
+            + (HBM2_JPBit * dl1->LineSize() * 8 * intel_icount[COUNTER_MISS]);
     
-    TPI_hammerblade_hit = CPI_hammerblade_hit / HZ_hammerblade;
-    TPI_xeon_hit = CPI_xeon_hit / HZ_xeon;
-
-    /* calculate time per miss */
-    UINT32 line_size = dl1->LineSize();
-    ASSERTX((line_size % 32) == 0);
-
-    LATENCY_MAP::iterator latency_it;
-
-    latency_it = latency.find(line_size);
-    if (latency_it == latency.end()) {
-	outFile << std::setw(prefix_width) << hammerblade_prefix << "Error: could not lookup latency for memory access size of " << dl1->LineSize() << "\n";
-	return;
-    }
-    TPI_hammerblade_miss = TPI_hammerblade_hit + (latency_it->second * 1e-9);
-
-    latency_it = latency.find(std::min(INTEL_CACHELINE_SIZE, 16384));
-    if (latency_it == latency.end()) {
-	outFile << std::setw(prefix_width) << xeon_prefix << "Error: could not lookup latency for memory access size of " << dl1_intel->LineSize() << "\n";
-	return;
-    }    
-    TPI_xeon_miss = TPI_xeon_hit + (latency_it->second * 1e-9);
-
-    /* calculate hammerblade runtime */
-    //Time_hammerblade  = (TPI_hammerblade_hit  * hammerblade_icount[COUNTER_HIT])/Cores_hammerblade; // hits
-    Time_hammerblade = hammerblade_icount[COUNTER_HIT] / (IPC_hammerblade_hit * Cores_hammerblade) / HZ_hammerblade;
-    Time_hammerblade += (TPI_hammerblade_miss * hammerblade_icount[COUNTER_MISS]); // +misses
-
-    /* calculate xeon runtime */
-    //Time_xeon =  (TPI_xeon_hit * intel_icount[COUNTER_HIT])/Cores_xeon; // hits
-    Time_xeon = (intel_icount[COUNTER_HIT] / (IPC_xeon_hit * Cores_xeon)) / HZ_xeon;
-    Time_xeon += (TPI_xeon_miss * intel_icount[COUNTER_MISS]); // +misses
-
-    // outFile << std::setw(prefix_width) << hammerblade_prefix << " Runtime: " << std::scientific << Time_hammerblade << "s" << "\n";
-    // outFile << std::setw(prefix_width) << xeon_prefix << " Runtime: " << std::scientific << Time_xeon << "s" << "\n";
-    
-    /* Calculate Watts */
-    POWER_MAP::iterator dram_watts;
-
-    dram_watts = power.find(dl1->LineSize());
-    if (dram_watts == power.end()) {
-	outFile << std::setw(prefix_width) << hammerblade_prefix << "Error: could not lookup power for memory access size of " << dl1->LineSize() << "\n";
-	return;
-    }
-    //Watts_hammerblade = (WPC_hammerblade * Cores_hammerblade) + dram_watts->second;
-    Watts_hammerblade = (WPC_hammerblade * Cores_hammerblade);
-
-    dram_watts = power.find(INTEL_CACHELINE_SIZE);
-    if (dram_watts == power.end()) {
-	outFile << std::setw(prefix_width) << xeon_prefix << "Error: could not lookup power for memory access size of " << INTEL_CACHELINE_SIZE << "\n";
-	return;
-    }
-    //Watts_xeon += dram_watts->second;
-
-    double Joules_hammerblade = Time_hammerblade * Watts_hammerblade + (HBM2_JPBit * dl1->LineSize() * 8 * intel_icount[COUNTER_MISS]);
-    double Joules_xeon = Time_xeon * Watts_xeon + (DDR4_JPBit * INTEL_CACHELINE_SIZE * 8 * intel_icount[COUNTER_MISS]);
-    
+    double Joules_xeon =
+               Xeon_JPInstruction * (intel_icount[COUNTER_HIT]+intel_icount[COUNTER_MISS])
+            + (DDR4_JPBit * INTEL_CACHELINE_SIZE * 8 * intel_icount[COUNTER_MISS]);
+                                 
     outFile << std::setw(prefix_width) << hammerblade_prefix << " Energy Cost: " << std::scientific << Joules_hammerblade << " J\n";
     outFile << std::setw(prefix_width) << xeon_prefix << " Energy Cost: " << std::scientific << Joules_xeon << " J\n";
 
