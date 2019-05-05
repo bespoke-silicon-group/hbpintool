@@ -27,7 +27,7 @@ pintool=${HBPINTOOL_ROOT}/obj-intel64/hbpintool.so
 pintool_flags=""
 pintool_flags="${pintool_flags} -a 1"    # direct mapped
 pintool_flags="${pintool_flags} -c 2"   # Cach size in KB
-pintool_flags="${pintool_flags} -b 1024"  # cache block size
+pintool_flags="${pintool_flags} -b 256"  # cache block size
 
 # usage function -- prints how to use this program
 function usage () {
