@@ -280,7 +280,8 @@ static void HBPintoolFini(int code, void *v)
     double Xeon_JPInstruction = 5.7e-9; // 3 nops per cycle
     double HammerBlade_JPInstruction = 9.4e-12;
     // memory energy costs
-    double DDR4_JPBit = 348e-12; // if we just stream
+    //double DDR4_JPBit = 348e-12; // if we just stream
+    double DDR4_JPBit = 124.07e-12;
     double HBM2_JPBit = 3.6e-12;
 
     double Joules_hammerblade_insts = HammerBlade_JPInstruction * (hammerblade_icount[COUNTER_HIT]+hammerblade_icount[COUNTER_MISS]);
