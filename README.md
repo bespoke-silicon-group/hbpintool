@@ -2,6 +2,8 @@
 
 `./configure && make`
 
+Note that for the binary-only release you should not run `make` -- just run `configure` to download the relevant pin release.
+
 # Using the Tool #
 
 The tool only supports being run from the source root of `hbpintool`.
