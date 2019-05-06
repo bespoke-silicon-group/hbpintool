@@ -292,32 +292,32 @@ static void HBPintoolFini(int code, void *v)
     double Joules_xeon_membits = (DDR4_JPBit * INTEL_CACHELINE_SIZE * 8 * intel_icount[COUNTER_MISS]);
     double Joules_xeon = Joules_xeon_insts + Joules_xeon_membits;             
     
-    outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
-            << "Instructions: " << std::scientific << (double) (hammerblade_icount[COUNTER_HIT]+hammerblade_icount[COUNTER_MISS]) << ", "
-            << "DRAM Bits: "   << std::scientific << (double) (hammerblade_icount[COUNTER_MISS] * dl1->LineSize() * 8) << ", "
-            << "Misses: "      << std::scientific << (double) (hammerblade_icount[COUNTER_MISS])
-            << "\n";
+    // outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
+    //         << "Instructions: " << std::scientific << (double) (hammerblade_icount[COUNTER_HIT]+hammerblade_icount[COUNTER_MISS]) << ", "
+    //         << "DRAM Bits: "   << std::scientific << (double) (hammerblade_icount[COUNTER_MISS] * dl1->LineSize() * 8) << ", "
+    //         << "Misses: "      << std::scientific << (double) (hammerblade_icount[COUNTER_MISS])
+    //         << "\n";
 
-    outFile << std::setw(prefix_width) << xeon_prefix << ": "
-            << "Instructions: " << std::scientific << (double) (intel_icount[COUNTER_HIT]+intel_icount[COUNTER_MISS]) << ", "
-            << "DRAM Bits: "   << std::scientific << (double) (intel_icount[COUNTER_MISS] * INTEL_CACHELINE_SIZE * 8) << ", "
-            << "Misses: "      << std::scientific << (double) (intel_icount[COUNTER_MISS])
-            << "\n";
+    // outFile << std::setw(prefix_width) << xeon_prefix << ": "
+    //         << "Instructions: " << std::scientific << (double) (intel_icount[COUNTER_HIT]+intel_icount[COUNTER_MISS]) << ", "
+    //         << "DRAM Bits: "   << std::scientific << (double) (intel_icount[COUNTER_MISS] * INTEL_CACHELINE_SIZE * 8) << ", "
+    //         << "Misses: "      << std::scientific << (double) (intel_icount[COUNTER_MISS])
+    //         << "\n";
     
     outFile << std::setw(prefix_width) << hammerblade_prefix << " Energy Cost: " << std::scientific << Joules_hammerblade << " J\n";
-    outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
-            << "Ins Energy Cost (%): "  << std::fixed << (Joules_hammerblade_insts/Joules_hammerblade)*100 << ", "
-            << "Mem Energy Cost (%): "  << std::fixed << (Joules_hammerblade_membits/Joules_hammerblade)*100
-            << "\n";
+    // outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
+    //         << "Ins Energy Cost (%): "  << std::fixed << (Joules_hammerblade_insts/Joules_hammerblade)*100 << ", "
+    //         << "Mem Energy Cost (%): "  << std::fixed << (Joules_hammerblade_membits/Joules_hammerblade)*100
+    //         << "\n";
     
     
     outFile << std::setw(prefix_width) << xeon_prefix << " Energy Cost: " << std::scientific << Joules_xeon << " J\n";
-    outFile << std::setw(prefix_width) << xeon_prefix << ": "
-            << "Ins Energy Cost (%): " << std::fixed << ((double)Joules_xeon_insts/Joules_xeon)*100 << ", "
-            << "Mem Energy Cost (%): " << std::fixed << ((double)Joules_xeon_membits/Joules_xeon)*100
-            << "\n";
+    // outFile << std::setw(prefix_width) << xeon_prefix << ": "
+    //         << "Ins Energy Cost (%): " << std::fixed << ((double)Joules_xeon_insts/Joules_xeon)*100 << ", "
+    //         << "Mem Energy Cost (%): " << std::fixed << ((double)Joules_xeon_membits/Joules_xeon)*100
+    //         << "\n";
 
-    outFile << "Energy Cost Ratio (" << xeon_prefix << "/" << hammerblade_prefix << "): " << std::fixed << Joules_xeon/Joules_hammerblade << "\n";
+    // outFile << "Energy Cost Ratio (" << xeon_prefix << "/" << hammerblade_prefix << "): " << std::fixed << Joules_xeon/Joules_hammerblade << "\n";
 }
 
 VOID Fini(int code, VOID * v)
