@@ -48,7 +48,7 @@
 #include "instlib.H"
 #include "filter.H"
 
-#define INTEL_CACHE_SIZE     (64 * MEGA)
+#define INTEL_CACHE_SIZE     ((64 * MEGA)/16)
 #define INTEL_CACHELINE_SIZE  64
 #define INTEL_ASSOCIATIVITY   8
 
@@ -162,7 +162,7 @@ static void ResetDl1(void)
     hammerblade_dl1s.push_back(dl1);
 }
 
-static void Routine(RTN rtn, void *v)
+void Routine(RTN rtn, void *v)
 {
     if (!filter.SelectRtn(rtn))
 	return;
@@ -277,7 +277,7 @@ static void HBPintoolFini(int code, void *v)
     std::string xeon_prefix        = "Xeon E7-8894 v4";
     
     // instruction energy costs
-    double Xeon_JPInstruction = 1e-9; // 3 nops per cycle
+    double Xeon_JPInstruction = 5.7e-9; // 3 nops per cycle
     double HammerBlade_JPInstruction = 9.4e-12;
     // memory energy costs
     double DDR4_JPBit = 60e-12; // if we just stream
@@ -292,13 +292,15 @@ static void HBPintoolFini(int code, void *v)
     double Joules_xeon = Joules_xeon_insts + Joules_xeon_membits;             
     
     outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
-            << "Instructions: " << std::scientific << (double) (hammerblade_icount[COUNTER_HIT]+hammerblade_icount[COUNTER_MISS])
-            << " DRAM Bits: "   << std::scientific << (double) (hammerblade_icount[COUNTER_MISS] * dl1->LineSize() * 8)
+            << "Instructions: " << std::scientific << (double) (hammerblade_icount[COUNTER_HIT]+hammerblade_icount[COUNTER_MISS]) << ", "
+            << "DRAM Bits: "   << std::scientific << (double) (hammerblade_icount[COUNTER_MISS] * dl1->LineSize() * 8) << ", "
+            << "Misses: "      << std::scientific << (double) (hammerblade_icount[COUNTER_MISS])
             << "\n";
 
     outFile << std::setw(prefix_width) << xeon_prefix << ": "
-            << "Instructions: " << std::scientific << (double) (intel_icount[COUNTER_HIT]+intel_icount[COUNTER_MISS])
-            << " DRAM Bits: "   << std::scientific << (double) (intel_icount[COUNTER_MISS] * INTEL_CACHELINE_SIZE * 8)
+            << "Instructions: " << std::scientific << (double) (intel_icount[COUNTER_HIT]+intel_icount[COUNTER_MISS]) << ", "
+            << "DRAM Bits: "   << std::scientific << (double) (intel_icount[COUNTER_MISS] * INTEL_CACHELINE_SIZE * 8) << ", "
+            << "Misses: "      << std::scientific << (double) (intel_icount[COUNTER_MISS])
             << "\n";
     
     outFile << std::setw(prefix_width) << hammerblade_prefix << " Energy Cost: " << std::scientific << Joules_hammerblade << " J\n";
