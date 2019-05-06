@@ -15,7 +15,7 @@ You should find the output in a file called `hbpintool.out`
 
 # Compile with -O3
 
-You'll get more accurate measurements if turn on compiler optimizations.
+You'll get more accurate measurements if aggresive compiler optimizations are turned on.
 
 # Preventing Compiler Inlining #
 
