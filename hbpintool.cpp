@@ -279,6 +279,9 @@ static void HBPintoolFini(int code, void *v)
     // instruction energy costs
     double Xeon_JPInstruction = 5.7e-9; // 3 nops per cycle
     double HammerBlade_JPInstruction = 5e-12;
+
+    // Xeon IPC = 1/2?
+    // Manycore IPC = 512 (or something?)
     
     // memory energy costs
     //double DDR4_JPBit = 348e-12; // if we just stream
@@ -293,34 +296,49 @@ static void HBPintoolFini(int code, void *v)
     double Joules_xeon_membits = (DDR4_JPBit * INTEL_CACHELINE_SIZE * 8 * intel_icount[COUNTER_MISS]);
     double Joules_xeon = Joules_xeon_insts + Joules_xeon_membits;             
 
-    // IPC, HZ => Instructions / (IPC * HZ) = Seconds
-    // Take Joules/Seconds
+    // // performance
+    // double Time_DRAM_Xeon = 60e-9; // 60ns
+    // double Time_DRAM_Hammerblade = (0.116e-9)*16; // 0.116ns
     
-    // outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
-    //         << "Instructions: " << std::scientific << (double) (hammerblade_icount[COUNTER_HIT]+hammerblade_icount[COUNTER_MISS]) << ", "
-    //         << "DRAM Bits: "   << std::scientific << (double) (hammerblade_icount[COUNTER_MISS] * dl1->LineSize() * 8) << ", "
-    //         << "Misses: "      << std::scientific << (double) (hammerblade_icount[COUNTER_MISS])
-    //         << "\n";
+    // outFile << std::setw(prefix_width) << hammerblade_prefix << " Estimated Performance: " << std::scientific << Time_DRAM_Hammerblade * hammerblade_icount[COUNTER_MISS] << "\n";
+    // outFile << std::setw(prefix_width) << xeon_prefix        << " Estimated Performance: " << std::scientific << Time_DRAM_Xeon * intel_icount[COUNTER_MISS]              << "\n";
+    // // IPC, HZ => Instructions / (IPC * HZ) = Seconds
+    // // Take Joules/Seconds
+    
+    // // outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
+    // //         << "Instructions: " << std::scientific << (double) (hammerblade_icount[COUNTER_HIT]+hammerblade_icount[COUNTER_MISS]) << ", "
+    // //         << "DRAM Bits: "   << std::scientific << (double) (hammerblade_icount[COUNTER_MISS] * dl1->LineSize() * 8) << ", "
+    // //         << "Misses: "      << std::scientific << (double) (hammerblade_icount[COUNTER_MISS])
+    // //         << "\n";
 
-    // outFile << std::setw(prefix_width) << xeon_prefix << ": "
-    //         << "Instructions: " << std::scientific << (double) (intel_icount[COUNTER_HIT]+intel_icount[COUNTER_MISS]) << ", "
-    //         << "DRAM Bits: "   << std::scientific << (double) (intel_icount[COUNTER_MISS] * INTEL_CACHELINE_SIZE * 8) << ", "
-    //         << "Misses: "      << std::scientific << (double) (intel_icount[COUNTER_MISS])
-    //         << "\n";
+    // // outFile << std::setw(prefix_width) << xeon_prefix << ": "
+    // //         << "Instructions: " << std::scientific << (double) (intel_icount[COUNTER_HIT]+intel_icount[COUNTER_MISS]) << ", "
+    // //         << "DRAM Bits: "   << std::scientific << (double) (intel_icount[COUNTER_MISS] * INTEL_CACHELINE_SIZE * 8) << ", "
+    // //         << "Misses: "      << std::scientific << (double) (intel_icount[COUNTER_MISS])
+    // //         << "\n";
     
-    outFile << std::setw(prefix_width) << hammerblade_prefix << " Energy Cost: " << std::scientific << Joules_hammerblade << " J\n";
-    // outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
-    //         << "Ins Energy Cost (%): "  << std::fixed << (Joules_hammerblade_insts/Joules_hammerblade)*100 << ", "
-    //         << "Mem Energy Cost (%): "  << std::fixed << (Joules_hammerblade_membits/Joules_hammerblade)*100
-    //         << "\n";
+    // outFile << std::setw(prefix_width) << hammerblade_prefix << " Energy Cost: " << std::scientific << Joules_hammerblade << " J\n";
+    // // outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
+    // //         << "Ins Energy Cost (%): "  << std::fixed << (Joules_hammerblade_insts/Joules_hammerblade)*100 << ", "
+    // //         << "Mem Energy Cost (%): "  << std::fixed << (Joules_hammerblade_membits/Joules_hammerblade)*100
+    // //         << "\n";
     
     
-    outFile << std::setw(prefix_width) << xeon_prefix << " Energy Cost: " << std::scientific << Joules_xeon << " J\n";
-    // outFile << std::setw(prefix_width) << xeon_prefix << ": "
-    //         << "Ins Energy Cost (%): " << std::fixed << ((double)Joules_xeon_insts/Joules_xeon)*100 << ", "
-    //         << "Mem Energy Cost (%): " << std::fixed << ((double)Joules_xeon_membits/Joules_xeon)*100
-    //         << "\n";
+    // outFile << std::setw(prefix_width) << xeon_prefix << " Energy Cost: " << std::scientific << Joules_xeon << " J\n";
+    // // outFile << std::setw(prefix_width) << xeon_prefix << ": "
+    // //         << "Ins Energy Cost (%): " << std::fixed << ((double)Joules_xeon_insts/Joules_xeon)*100 << ", "
+    // //         << "Mem Energy Cost (%): " << std::fixed << ((double)Joules_xeon_membits/Joules_xeon)*100
+    // //         << "\n";
 
+    double hammerblade_gop = (hammerblade_icount[COUNTER_HIT] + hammerblade_icount[COUNTER_MISS])/1e9;
+    double intel_gop       = (intel_icount[COUNTER_HIT] + intel_icount[COUNTER_MISS])/1e9;
+    
+    outFile << std::setw(prefix_width) << hammerblade_prefix << ": "
+            << std::scientific << hammerblade_gop / Joules_hammerblade << " GOPS/Watt\n";
+
+    outFile << std::setw(prefix_width) << xeon_prefix << ": "
+            << std::scientific <<  intel_gop / Joules_xeon << " GOPS/Watt\n";
+    
     // outFile << "Energy Cost Ratio (" << xeon_prefix << "/" << hammerblade_prefix << "): " << std::fixed << Joules_xeon/Joules_hammerblade << "\n";
 }
 
