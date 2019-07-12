@@ -110,5 +110,5 @@ else
     pintool_flags="${pintool_flags} -filter_rtn ${edgeset_apply_func} -epoch_marker ${edgeset_apply_func}"
 fi
 
-echo "${pin} -t ${pintool} ${pintool_flags} -- ./${executable_name} ${@} >/dev/null"
+echo "${pin} -t ${pintool} ${pintool_flags} -- ${executable_name} ${@} >/dev/null"
 ${pin} -t ${pintool} ${pintool_flags} -- ${executable_name} ${@} >/dev/null
