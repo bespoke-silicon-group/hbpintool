@@ -28,7 +28,7 @@ pintool_flags=""
 pintool_flags="${pintool_flags} -a 1"    # direct mapped
 pintool_flags="${pintool_flags} -c 2"   # Cach size in KB
 pintool_flags="${pintool_flags} -b 256"  # cache block size
-
+#/pin -t source/tools/SimpleExamples/obj-intel64/opcodemix.so -filter_rtn `objdump -t /workspace/py-graphit-example/sssp.so | grep edgeset_apply | awk '{print $6}'` -- `which python3` /workspace/py-graphit-example/example.py 
 # usage function -- prints how to use this program
 function usage () {
     echo "Usage: ${executable} YOUR-PROGRAM YOUR-PROGRAM-ARGS..."
@@ -36,6 +36,7 @@ function usage () {
     echo "        -v,--version      Print the version string"
     echo "        -h,--help         Print this help message and exit"
     echo "        -o,--output       Filename for instrumenting results (default is hbpintool.out)"
+    echo "        --gtdll           Path to compiled GraphIt shared object (used when profiling a python program that calls GraphIt functions)"
 }
 
 if [ -z "${PIN_ROOT}" ]; then
@@ -44,7 +45,7 @@ if [ -z "${PIN_ROOT}" ]; then
 fi
 
 # parse options
-options=`getopt -o vho: --long version,help,output: -- "${@}"`
+options=`getopt -o vho: --long version,help,output:,gtdll: -- "${@}"`
 if [ ! $? -eq 0 ]; then
     echo "Bad options"
     exit 1
@@ -55,7 +56,8 @@ while true; do
     case "$1" in
         -h|--help)    usage; exit 0;;
 	-v|--version) echo "HammerBlade Pintool v${VERSION}"; exit 0;;
-	-o|--output)  shift; pintool_flags="${pintool_flags} -o ${1}"; break;;
+	-o|--output)  shift; pintool_flags="${pintool_flags} -o ${1}";;
+	--gtdll)      shift; gtdll="${1}";;
         --)           shift; break;;
     esac
     shift
@@ -63,6 +65,7 @@ done
 
 # set program name and arguments
 executable_name=$1
+echo ${executable_name}
 shift # result of the arguments are set '$@'
 
 # if there's no exutable then we should just quit
@@ -84,14 +87,21 @@ fi
 # check that this file is a supported executable type
 supported_executable_type="x86-64"
 file_supported=`echo ${file_check_stdout} | grep "${supported_executable_type}"`
-if [ -z "${file_supported}" ]; then
+if [ -z "${file_supported}" ] && [ -z "${gtdll}" ]; then
     >&2 echo "Error: ${executable_name}: Unsupported executable type: only ${supported_executable_type} is supported"
     usage
     exit 1
 fi
-   
+
 # get the name-mangled version of "edgeset_apply"
-edgeset_apply_func=`objdump -t ${executable_name} | grep edgeset_apply | awk '{print $6}'`
+if [ -z "${gtdll}" ]; then
+    # this is the executed program itself
+    edgeset_apply_func=`objdump -t ${executable_name} | grep edgeset_apply | awk '{print $6}'`
+else
+    # this a shared object that needs to be examined
+    edgeset_apply_func=`objdump -t ${gtdll} | grep edgeset_apply | awk '{print $6}'`
+fi
+
 if [ -z "${edgeset_apply_func}" ]; then
     >&2 echo "Warning: The edgeset_apply function has been optimized out"
     >&2 echo "         We recommend adding '__attribute__((noinline))' to the definition of 'edgeset_apply_*' in your GraphIt-generated C++ file."

@@ -37,3 +37,17 @@ The models it uses to calculate energy factors in the parallelism for the releva
 # Intel 64 #
 
 This tool can only run on Intel x86_64 processors.
+
+# Evaluating GraphIt programs called by Python3 #
+
+This requires that the GraphIt shared object be compiled e.g. `APPLICATION.cpython-36m-x86_64-linux-gnu.so`.
+
+Invoke `hbpintool` like this:
+
+```
+./hbpintool --gtdll /path/to/your/graphit/app.cpython.so `which python3` /path/to/your/python/script.py [your-python-script-arguments]`
+```
+
+Note that the `which python3` expands to the absolute path to your Python interpreter and it takes the place of your program in the invocation.
+
+Do **NOT** invoke `hbpintool` on your python script directly. It will not work! 
